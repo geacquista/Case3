@@ -143,7 +143,7 @@ ui <- fluidPage(
       numericInput(inputId = "num1", label = "Math Score", value = 100),
       numericInput(inputId = "num2", label = "Reading Score", value = 100),
       numericInput(inputId = "num3", label = "Writing Score", value = 100),
-      actionButton("newplot", label = "New Plot"),
+      actionButton("showText", label = "Show Text"),
       p("The dataset I used for this assignment is a set of students with various demographical information, 
         and the exam scores they received in math, reading, and writing."),
       p("The algorithm I used for my dataset is Principle Component Analysis. This method is an unsupervised
@@ -297,20 +297,17 @@ server <- function(input, output) {
       # PC plot with the different identifying variables
       # "Gender" = 1,"Race/Ethnicity Group" = 2,"Lunch Type" = 3,"Preparation Course" = 4,"Parental Education" = 5
       if(input$identifiers == 1) {
-        ggplot(scores,aes(x=PC1,y=PC2,color=gender)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
+        p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=gender)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
       } else  if(input$identifiers == 2) {
-        ggplot(scores,aes(x=PC1,y=PC2,color=race.ethnicity)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
+        p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=race.ethnicity)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
       } else  if(input$identifiers == 3) {
-        ggplot(scores,aes(x=PC1,y=PC2,color=lunch)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
+        p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=lunch)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
       } else  if(input$identifiers == 4) {
-        ggplot(scores,aes(x=PC1,y=PC2,color=test.preparation.course)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
+        p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=test.preparation.course)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
       } else {
-        ggplot(scores,aes(x=PC1,y=PC2,color=parental.level.of.education)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
+        p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=parental.level.of.education)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
       }
       
-    })
-    
-    observeEvent(input$newplot, {
       ##-- Predictive Modeling
       new_exam_score <- c(input$num1,input$num2,input$num3, {input$num1+input$num2+ input$num3/3})
       
@@ -318,6 +315,10 @@ server <- function(input, output) {
       
       new_group <- predict(pca_model, newdata = exam_reduced_w_nc[nrow(exam_reduced_w_nc),])
       new_point <- new_group[, 1:2]
+      
+      p2 <- p1 + geom_point(aes(x=new_point[1], y=new_point[2]), colour="blue", size =3)
+      p2
+      
       
     })
     
