@@ -18,10 +18,7 @@ library(RcppArmadillo)
 
 
 # ----- ?
-library(RCurl)
-library(plyr)
-library(DT)
-library(ggrepel)
+
 
 # --------  UI BEGINS HERE --------- #
 ui <- fluidPage(
@@ -34,8 +31,6 @@ ui <- fluidPage(
     
     # Sidebar panel: INPUTS
     sidebarPanel(
-      
-      text("Histogram parameters:"),
       
       fluidRow(
         column(4,
@@ -143,16 +138,23 @@ ui <- fluidPage(
       numericInput(inputId = "num1", label = "Math Score", value = 100),
       numericInput(inputId = "num2", label = "Reading Score", value = 100),
       numericInput(inputId = "num3", label = "Writing Score", value = 100),
-      actionButton("showText", label = "Show Text"),
       p("The dataset I used for this assignment is a set of students with various demographical information, 
-        and the exam scores they received in math, reading, and writing."),
-      p("The algorithm I used for my dataset is Principle Component Analysis. This method is an unsupervised
+        and the exam scores they received in math, reading, and writing.The algorithm I used for my dataset is Principle Component Analysis. This method is an unsupervised
         machine learning algorithm. It reduces the dimensionality of a dataset but still retains most information.
         This analysis generates a new set of variables that are linear combinations of the original variables. 
         It creates an alternative axis in space where the greatest variance by the projection lies on the first 
         coordinate, then the second, and so on. Computationally, PCs are found by calculating the eigenvectors 
         and eigenvalues of the data covariance matrix. The eigenvalue is the coefficient of its respective eigenvector. 
-        In this dataset, there are 5 different categories besides the quantitative scores. ")
+        In this dataset, there are 5 different categories besides the quantitative scores. "),
+      p("This app gives end users the ability to play with the data filters. They can also edit their three scores to determine where 
+        they would fall on the primary component chart, and see if you can predict the identifying factor. It also features a histogram to view 
+        the distribution of scores depending on the test type, or average of all the tests."),
+      p("To recap, 
+                 I collected data on the math, reading, and writing scores of 1000 students with different demographic backgrounds and preparation tactics. 
+                 This topic was interesting to me because I was hoping to discover patterns in data when it comes to exam taking. I often wonder if there are 
+                 any identifiers that may influence exam scores.
+                 I analyzed the data using Principle Component Analysis.
+                 The most significant finding in the data was that the Gender category that showed up distinctly in the PC scatter plot. ")
       
     ),
     
@@ -163,13 +165,7 @@ ui <- fluidPage(
       # Output: Histogram ----
       plotOutput(outputId = "distPlot"),
       # Output: principle component scatter plot ----
-      plotOutput(outputId = "pcplot")
-      # Output: Test png ----
-      #plotOutput(outputId = "test"),
-      # 
-      #plotOutput(outputId = "prediction")
-      # Output: box plots for reference
-      # plotOutput(outputId = "box_plots")
+      plotOutput(outputId = "pcplot"),
       
     )
   )
@@ -190,8 +186,8 @@ server <- function(input, output) {
   exam.m <- melt(shinyData)
   
   shinyData$average <- rowMeans(shinyData[,6:8])
-  shinyData$gender <- str_replace(shinyData$gender, "female", "F")
-  shinyData$gender <- str_replace(shinyData$gender, "male", "M")
+  shinyData$gender <- str_replace(shinyData$gender, "female", 'F')
+  shinyData$gender <- str_replace(shinyData$gender, "male", 'M')
   
   # Convert my id variables to factors
   shinyData$gender <- as.factor(shinyData$gender)
@@ -220,10 +216,9 @@ server <- function(input, output) {
   summary_pcamodel = summary(pca_model)
   
   # Plotting the 4 PC's, looks like PC1 is most significant
-  plot(pca_model,type = "l", main ="Scree-plot for PCA")
+  # plot(pca_model,type = "l", main ="Scree-plot for PCA")
   
-  #
-  plot(summary_pcamodel$importance[3,],type="l")
+  #plot(summary_pcamodel$importance[3,],type="l")
   
   #For PC 1
   pc1 <- pca_model$rotation[,1]
@@ -239,199 +234,155 @@ server <- function(input, output) {
   
   scores <- data.frame(shinyData, pca_model$x[,1:2])
   
-  
   # Get the reactive inputs
   group_filter <- reactive({input$identifiers}) # this will determine which id to use "gender, parental education, race, lunch, test preparation"
+  
   new_math <- reactive({input$num1})            # new math score based on user input
   new_reading <- reactive({input$num2})
   new_writing <- reactive({input$num3})
+  
   test_type <- reactive({input$testTypes})
   chart_types <-reactive({input$chartsDisplaying})
+  shinyDataFilter <- read.csv("exams.csv") 
+  
+  
   
   # ---- Charts here ---- #
-    # Histogram of the Exam Data ----
-    # Responds to requested number of bins.
-    # Reactive data starting
-    output$distPlot <- renderPlot({
-      
-      
-      # "Gender" = 1,"Race/Ethnicity Group" = 2,"Lunch Type" = 3,"Preparation Course" = 4,"Parental Education" = 5
-      filterChoice <- ''
-      if(group_filter() == 1) {
-        filterChoice <- shinyData$gender
-      } else  if(group_filter() == 2) {
-        filterChoice <- shinyData$race.ethnicity
-      } else  if(group_filter == 3) {
-        filterChoice <- shinyData$lunch
-      } else  if(group_filter == 4) {
-        filterChoice <- shinyData$test.preparation.course
-      } else {
-        filterChoice <- shinyData$parental.level.of.education
-      }
-      
-      if (test_type() == 0) {
-        x    <- shinyData$average
-        label_is <- "Average (Reading, Writing, Math)"
-        title_is <- "Histogram of Average Exam Scores"
-      } else if (test_type() == 1) {
-        x    <- shinyData$writing.score
-        label_is <- "Writing score"
-        title_is <- "Histogram of Writing Exam Scores"
-      } else if (test_type() == 2) {
-        x    <- shinyData$reading.score
-        label_is <- "Reading score"
-        title_is <- "Histogram of Reading Exam Scores"
-      } else {
-        x    <- shinyData$math.score
-        label_is <- "Math score"
-        title_is <- "Histogram of Math Exam Scores"
-      } 
-      
-      ggplot(shinyData) + geom_histogram(aes(x, fill = filterChoice), bins = input$bins, fill = "blue", color = "white") + ggtitle(title_is) + xlab(label_is)
-      #hist(x, breaks = bins, col = "#007bc2", border = "white",xlab = label_is,main = title_is)
-      
-    })
+  # Histogram of the Exam Data ----
+  # Responds to requested number of bins.
+  # Reactive data starting
+  output$distPlot <- renderPlot({
     
-    output$pcplot <- renderPlot({
-      
-      # PC plot with the different identifying variables
-      # "Gender" = 1,"Race/Ethnicity Group" = 2,"Lunch Type" = 3,"Preparation Course" = 4,"Parental Education" = 5
-      if(input$identifiers == 1) {
-        p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=gender)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
-      } else  if(input$identifiers == 2) {
-        p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=race.ethnicity)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
-      } else  if(input$identifiers == 3) {
-        p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=lunch)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
-      } else  if(input$identifiers == 4) {
-        p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=test.preparation.course)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
-      } else {
-        p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=parental.level.of.education)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
-      }
-      
-      ##-- Predictive Modeling
-      new_exam_score <- c(input$num1,input$num2,input$num3, {input$num1+input$num2+ input$num3/3})
-      
-      exam_reduced_w_nc <- rbind(exam_score_cols,new_exam_score)
-      
-      new_group <- predict(pca_model, newdata = exam_reduced_w_nc[nrow(exam_reduced_w_nc),])
-      new_point <- new_group[, 1:2]
-      
-      p2 <- p1 + geom_point(aes(x=new_point[1], y=new_point[2]), colour="blue", size =3)
-      p2
-      
-      
-    })
+    testData <- read.csv("exams.csv") 
+    
+    if (test_type() == 0) {
+      x    <- shinyData$average
+      label_is <- "Average (Reading, Writing, Math)"
+      title_is <- "Histogram of Average Exam Scores"
+    } else if (test_type() == 1) {
+      x    <- shinyData$writing.score
+      label_is <- "Writing score"
+      title_is <- "Histogram of Writing Exam Scores"
+    } else if (test_type() == 2) {
+      x    <- shinyData$reading.score
+      label_is <- "Reading score"
+      title_is <- "Histogram of Reading Exam Scores"
+    } else {
+      x    <- shinyData$math.score
+      label_is <- "Math score"
+      title_is <- "Histogram of Math Exam Scores"
+    } 
     
     
-    output$test <- renderPlot({
+    
+    # "Gender" = 1,"Race/Ethnicity Group" = 2,"Lunch Type" = 3,"Preparation Course" = 4,"Parental Education" = 5
+    if(group_filter() == 1) {
+      ggplot(testData) + geom_histogram(aes(x, fill = gender), bins = input$bins, color = "white") + ggtitle(title_is) + xlab(label_is)
       
+    } else  if(group_filter() == 2) {
+      ggplot(testData) + geom_histogram(aes(x, fill = race.ethnicity), bins = input$bins, color = "white") + ggtitle(title_is) + xlab(label_is)
       
+    } else  if(group_filter() == 3) {
+      ggplot(testData) + geom_histogram(aes(x, fill = lunch), bins = input$bins, color = "white") + ggtitle(title_is) + xlab(label_is)
       
-      # Gender: 3D scatterplot with different shapes differentiating gender
-      # shapes = c(16, 17) 
-      # shapes <- shapes[as.numeric(shinyData$gender)]
-      # scatterplot3d(shinyData[,6:8], pch = shapes)
+    } else  if(group_filter() == 4) {
+      ggplot(testData) + geom_histogram(aes(x, fill = test.preparation.course), bins = input$bins, color = "white") + ggtitle(title_is) + xlab(label_is)
+      
+    } else {
+      ggplot(testData) + geom_histogram(aes(x, fill = parental.level.of.education), bins = input$bins, color = "white") + ggtitle(title_is) + xlab(label_is)
+    }
+    
+  })
   
-      
-      data <- shinyData
-      
-      colors <- c("blue", "purple")
-      colors = colors[as.numeric(data$test.preparation.course)]
-      sample_3d_plot <- with(data, scatterplot3d(math.score,reading.score,writing.score, color = colors, pch = 19, box = TRUE))
-      legend("topleft", legend = levels(data$test.preparation.course), col =  c("blue", "purple"), pch = 16)
-      
-      # colors <- c("yellow", "red", "green", "blue", "purple")
-      # colors = colors[as.numeric(shinyData$race.ethnicity)]
-      # sample_3d_plot <- with(shinyData, scatterplot3d(math.score,reading.score,writing.score, color = colors, pch = shapes, box = TRUE))
-      # legend("topleft", legend = levels(shinyData$gender), col =  c("blue", "pink"), pch = 16)
-      
-    })
+  output$pcplot <- renderPlot({
     
-    output$prediction <- renderPlot({
-      
-      # new_exam_score <- c(input$num1,input$num2,input$num3)
-      new_mean <- mean(c(new_writing,new_math,new_reading), trim = 0)
-      new_exam_score <- c(new_math, new_reading, new_writing, new_mean)
-      
-      
-      exam_score_cols
-      new_exam_score
-      
-      # exam_score_cols_nc <- rbind(new_exam_score,exam_score_cols)
-      
-      #new_scores <- predict(pca_model, newdata = exam_score_cols_nc[nrow(exam_score_cols_nc),])
-      #new_scores_pc1pc2 <- new_scores[, 1:2]
-      
-      #plot_3 <- plot_filtered + geom_point(aes(x=new_cus_group_PC1_PC2[1], y=new_cus_group_PC1_PC2[2]), colour="blue", size =4)
-      #plot_3 <- plot_3 + labs(title="Plotting new observation against PC1 and PC2")
-      
-      #print(plot_3)
-      
-      
-      # split data into 2 parts for pca training (75%) and prediction (25%)
-      set.seed(1)
-      samp <- sample(nrow(exam_score_cols), nrow(exam_score_cols)*0.75)
-      exam_score_cols.train <- exam_score_cols[samp,]
-      exam_score_cols.valid <- exam_score_cols[-samp,]
-      
-      # conduct PCA on training dataset
-      pca_training <- prcomp(exam_score_cols.train[,1:4], retx=TRUE, center=TRUE, scale=TRUE)
-      explaing <- round(pca_training$sdev^2/sum(pca_training$sdev^2)*100) 
-      
-      # prediction of PCs for validation dataset
-      prediction <- predict(pca_training, newdata=exam_score_cols.valid[,1:4])
-      
-      ###Plot result
-      COLOR <- c(2:3)
-      PCH <- c(1,16)
-      
-      pc <- c(1,2) # principal components to plot
-      
-      #png("pca_pred.png", units="in", width=5, height=4, res=200)
-      op <- par(mar=c(4,4,1,1), ps=10)
-      plot(pca$x[,pc], col=COLOR[exam_score_cols.train$gender], cex=PCH[1], 
-           xlab=paste0("PC ", pc[1], " (", expl.var[pc[1]], "%)"), 
-           ylab=paste0("PC ", pc[2], " (", expl.var[pc[2]], "%)")
-      )
-      points(pred[,pc], col=COLOR[exam_score_cols.valid$gender], pch=PCH[2])
-      # legend("topright", legend=levels(exam_score_cols$gender), fill = COLOR, border=COLOR)
-      # legend("topleft", legend=c("training data", "validation data"), col=1, pch=PCH)
-      par(op)
-      dev.off()
-    })
+    # PC plot with the different identifying variables
+    # "Gender" = 1,"Race/Ethnicity Group" = 2,"Lunch Type" = 3,"Preparation Course" = 4,"Parental Education" = 5
+    if(input$identifiers == 1) {
+      p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=gender)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
+    } else  if(input$identifiers == 2) {
+      p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=race.ethnicity)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
+    } else  if(input$identifiers == 3) {
+      p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=lunch)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
+    } else  if(input$identifiers == 4) {
+      p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=test.preparation.course)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
+    } else {
+      p1 <- ggplot(scores,aes(x=PC1,y=PC2,color=parental.level.of.education)) + geom_point(size =2) + labs(title="Plotting Exam Data against PC1 and PC2")
+    }
     
-    output$box_plots <- renderPlot({
-      box_plot_gender <- ggplot(exam.m, aes(x = variable, y = value, fill = gender)) +
-        geom_boxplot() +
-        scale_fill_manual(values = c("plum", "gold2","ivory4")) +
-        ggtitle("Range of Exam Scores by Gender") +
-        xlab("Exam Type") + ylab("Score")
-      
-      box_plot_race <- ggplot(exam.m, aes(x = variable, y = value, fill = race.ethnicity)) +
-        geom_boxplot() +
-        scale_fill_manual(values = c("plum", "gold2","ivory4","purple", "brown")) +
-        ggtitle("Range of Exam Scores by Race Group") +
-        xlab("Exam Type") + ylab("Score")
-      
-      box_plot_parent <- ggplot(exam.m, aes(x = variable, y = value, fill = parental.level.of.education)) +
-        geom_boxplot() +
-        scale_fill_manual(values = c("plum", "gold2","ivory4","purple","brown","green")) +
-        ggtitle("Range of Exam Scores by Parental Level Education") +
-        xlab("Exam Type") + ylab("Score")
-      
-      box_plot_lunch <- ggplot(exam.m, aes(x = variable, y = value, fill = lunch)) +
-        geom_boxplot() +
-        scale_fill_manual(values = c("plum", "gold2","ivory4")) +
-        ggtitle("Range of Exam Scores by Lunch Type") +
-        xlab("Exam Type") + ylab("Score")
-      
-      box_plot_course <- ggplot(exam.m, aes(x = variable, y = value, fill = test.preparation.course)) +
-        geom_boxplot() +
-        scale_fill_manual(values = c("plum", "gold2","ivory4")) +
-        ggtitle("Range of Exam Scores by Preparation") +
-        xlab("Exam Type") + ylab("Score")
-    })
-  
+    ##-- Predictive Modeling
+    new_exam_score <- c(input$num1,input$num2,input$num3)
+    
+    exam_reduced_nc <- rbind(exam_score_cols,new_exam_score)
+    
+    new_group <- predict(pca_model, newdata = exam_reduced_nc[nrow(exam_reduced_nc),])
+    new_point <- new_group[, 1:2]
+    
+    p2 <- p1 + geom_point(aes(x=new_point[1], y=new_point[2]), color="blue", size =3)
+    p2
+    
+  })
 }
 
+# Running shiny::runGitHub("geacquista/Case3") works
 shinyApp(ui = ui, server = server) # running the shiny app
+
+
+# Gender
+#if (input$gender == 'm') {
+#  testData<-shinyData %>% filter(str_detect(gender, "male"))
+#} else if (input$gender == 'f') {
+#  testData<-shinyData %>% filter(str_detect(gender, "female"))
+#} else {
+#  testData <- shinyData
+#}
+
+# Race
+#if (input$race == 'a') {
+#  testData<-shinyData %>% filter(str_detect(race.ethnicity, "group A"))
+#} else if (input$race == 'b') {
+#  testData<-shinyData %>% filter(str_detect(race.ethnicity, "group B"))
+#} else if (input$race == 'c') {
+#  testData<-shinyData %>% filter(str_detect(race.ethnicity, "group C"))
+#}else if (input$race == 'd') {
+#  testData<-shinyData %>% filter(str_detect(race.ethnicity, "group D"))
+#}else if (input$race == 'e') {
+#  testData<-shinyData %>% filter(str_detect(race.ethnicity, "group E"))
+#}
+#else {
+#  testData <- shinyData
+#}
+
+# Lunch
+#if (input$lunch == 's') {
+#  testData<-shinyData %>% filter(str_detect(lunch, "standard"))
+#} else if (input$gender == 'r') {
+#  testData<-shinyData %>% filter(str_detect(lunch, "free/reduced"))
+#} else {
+#  testData <- shinyData
+#}
+
+# Course
+#if (input$course == 'n') {
+# testData<-shinyData %>% filter(str_detect(course, "none"))
+#} else if (input$course == 'y') {
+#  testData<-shinyData %>% filter(str_detect(course, "completed"))
+#} else {
+#  testData <- shinyData
+#}
+
+# Parental 
+#if (input$race == 'a') {
+# testData<-shinyData %>% filter(str_detect(race.ethnicity, "group A"))
+#} else if (input$race == 'b') {
+#  testData<-shinyData %>% filter(str_detect(race.ethnicity, "group B"))
+#} else if (input$race == 'c') {
+#  testData<-shinyData %>% filter(str_detect(race.ethnicity, "group C"))
+#}else if (input$race == 'd') {
+#  testData<-shinyData %>% filter(str_detect(race.ethnicity, "group D"))
+#}else if (input$race == 'e') {
+#  testData<-shinyData %>% filter(str_detect(race.ethnicity, "group E"))
+#}
+#else {
+#  testData <- shinyData
+#}
